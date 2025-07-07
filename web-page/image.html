@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Predictor</title>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root 
+    {
+      --primary: #4f46e5;
+      --bg: #f9fafb;
+      --border: #e5e7eb;
+      --text: #374151;
+    }
+
+    * { box-sizing: border-box; }
+
+    body 
+    {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4rem 1rem;
+      min-height: 100vh;
+    }
+
+    h1 
+    {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 600;
+      margin: 0 0 2rem;
+      color: var(--primary);
+      text-align: center;
+    }
+
+    .dropdown 
+    {
+      margin-bottom: 1.5rem;
+    }
+
+    select 
+    {
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border);
+      outline: none;
+      background: white;
+      cursor: pointer;
+    }
+
+    .drop-container 
+    {
+      position: relative;
+      width: min(420px, 90vw);
+      padding: 3rem 2rem;
+      border: 2px dashed var(--border);
+      border-radius: 1rem;
+      background: #ffffff;
+      cursor: pointer;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      text-align: center;
+    }
+
+    .drop-container:hover,
+    .drop-container.dragover 
+    {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+    }
+
+    .drop-container input 
+    {
+      display: none;
+    }
+
+    .drop-container p 
+    {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .drop-container p strong 
+    {
+      font-weight: 600;
+    }
+
+    .preview 
+    {
+      width: min(420px, 90vw);
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .preview img 
+    {
+      max-width: 100%;
+      max-height: 320px;
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <h1>Image Predictor</h1>
+
+  <div class="dropdown">
+    <select id="categorySelect">
+      <option value="">--Select Category--</option>
+      <option value="flower">Flower</option>
+      <option value="car">Car</option>
+      <option value="animal">Animal</option>
+      <option value="celebs">Celebs</option>
+      <option value="anime">Anime</option>
+    </select>
+  </div>
+
+  <label class="drop-container" id="drop-area">
+    <input type="file" id="fileElem" accept="image/*">
+    <p><strong>Drag & Drop</strong> or <strong>Click to Upload</strong></p>
+  </label>
+
+  <div class="preview" id="preview"></div>
+
+  <script>
+    const dropArea = document.getElementById("drop-area");
+    const fileInput = document.getElementById("fileElem");
+    const preview = document.getElementById("preview");
+    const categorySelect = document.getElementById("categorySelect");
+
+    ["dragenter", "dragover"].forEach(eventName => {
+      dropArea.addEventListener(eventName, e => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropArea.classList.add("dragover");
+      }, false);
+    });
+
+    ["dragleave", "drop"].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => dropArea.classList.remove("dragover"), false);
+    });
+
+    dropArea.addEventListener("drop", e => {
+      e.preventDefault();
+      if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        handleFiles();
+      }
+    }, false);
+
+    fileInput.addEventListener("change", handleFiles, false);
+
+    function handleFiles() 
+    {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const selectedCategory = categorySelect.value;
+      if (!selectedCategory) 
+      {
+        alert("Please select a category before uploading.");
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) 
+      {
+        alert("Please select an image file.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        const base64Image = e.target.result;
+
+        const img = document.createElement("img");
+        img.src = base64Image;
+        img.alt = "Uploaded preview";
+        preview.innerHTML = "";
+        preview.appendChild(img);
+
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: base64Image,
+            category: selectedCategory
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          const result = document.createElement("p");
+          result.textContent = `Prediction: ${data.prediction}`;
+          result.style.fontWeight = "bold";
+          result.style.fontSize = "1.2rem";
+          result.style.color = "#4f46e5";
+          preview.appendChild(result);
+        })
+        .catch(err => {
+          alert("Prediction failed: " + err.message);
+        });
+      };
+
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>
